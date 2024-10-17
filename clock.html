@@ -19,7 +19,7 @@ https://engineering.nyu.edu/news/new-chapter-creative-coding-nyu-tandon
 */
 
 function setup() {
-  createCanvas(600, 600);
+  createCanvas(600, 300);
   frameRate(60);
 	
 	// define the colors
@@ -29,8 +29,8 @@ function setup() {
   COLOR_END = color("#DE3163");
 	
 	// define text styles
-  textSize(50);
-  textFont("Georgia");
+  textSize(100);
+  textFont("Arial");
   textAlign(CENTER);
 	noStroke();
 }
@@ -41,7 +41,7 @@ function draw() {
 	
 	// dispay time of the day in the center of the canvas
   fill(COLOR_TEXT);
-  text(hour()+"h "+minute()+"m "+second()+"s", 0, 0);
+  text(hour()+"："+minute()+"："+second()+"", 0, 0);
 
 	// define variables for trigonomitric functions used in Lissajous curves
   var amplitude1 = width/3;
