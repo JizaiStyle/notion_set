@@ -1,22 +1,25 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ja">
 <head>
   <meta charset="UTF-8">
   <title>Tree Shapes with p5.js</title>
-  <!-- Include p5.js library -->
+  <!-- p5.jsライブラリを読み込む -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.2/p5.js"></script>
   <style>
+    /* 余白をなくし、キャンバスが全画面を占めるように設定 */
     body {
       margin: 0;
       padding: 0;
-      overflow: hidden; /* Hide scrollbars */
-      background-color: #FEF3E0; /* Set initial background color */
+      overflow: hidden; /* スクロールバーを非表示 */
+    }
+    canvas {
+      display: block; /* キャンバスをブロック要素として表示 */
     }
   </style>
 </head>
 <body>
   <script>
-    // Define color palettes
+    // カラーパレットの定義
     let palettes = [
       ["#bdd7d3", "#b8c8be", "#91958b", "#465b5e", "#543933", "#8e1623", "#f28c7a", "#eee1ca"],
       ["#451c06", "#743212", "#9c400a", "#f97e01", "#929e78", "#13b2bc", "#0c8194"],
@@ -28,7 +31,7 @@
     let rot;
 
     function setup() {
-      createCanvas(windowWidth, windowHeight * 0.666);
+      createCanvas(windowWidth, windowHeight);
       colors = random(palettes);
       background("#FEF3E0");
       rot = 1;
@@ -56,7 +59,7 @@
       colorPicker++;
       let r = (height * 0.7065) / 2;
 
-      // Draw the main shape
+      // メインの形を描画
       push();
       beginShape();
       for (let angle = PI - PI / 4; angle < TAU + PI / 4; angle += TAU / 600) {
@@ -69,7 +72,7 @@
         vertex(-height / 2 + cos(angle) * r, height / 4 + sin(angle) * r);
       }
 
-      // Apply shadow
+      // シャドウを適用
       drawingContext.shadowOffsetX = 0;
       drawingContext.shadowOffsetY = 0;
       drawingContext.shadowBlur = height / 3;
@@ -78,7 +81,7 @@
       endShape(CLOSE);
       pop();
 
-      // Draw subtle lines for texture
+      // テクスチャ用の細かい線を描画
       push();
       let stroker = color(edgeColor);
       stroker.setAlpha(25);
@@ -113,13 +116,12 @@
       for (let a = 0; a < TAU; a += splice) {
         let mixer = map(sin(a), -1, 1, 0, 1);
         
-        // Replace spectral.mix with lerpColor
+        // lerpColorを使用して色を補間
         let c2col = color(c2);
         let c3col = color(c3);
         let outerC = lerpColor(c2col, c3col, mixer);
 
         let coloring = drawingContext.createRadialGradient(x, y, 0.0, x + random(-r / 50, r / 50), y, r * 0.75);
-        drawingContext.createRadialGradient(x, y, 0.0, x + random(-r / 50, r / 50), y, r * 0.75);
         coloring.addColorStop(0, cc);
         coloring.addColorStop(1, outerC.toString());
         drawingContext.fillStyle = coloring;
@@ -129,7 +131,7 @@
     }
 
     function windowResized() {
-      resizeCanvas(windowWidth, windowHeight * 0.666);
+      resizeCanvas(windowWidth, windowHeight);
       background("#FEF3E0");
       colorPicker = 0;
       rot = 1;
