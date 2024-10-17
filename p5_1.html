@@ -12,144 +12,143 @@
 </head>
 <body>
     <script>
+/*
+== WCCC_Industrial ==
+While i genuenly like the things i create, sometimes it is the process more then the piece that makes me like a piece particularely much.
+This weeks contribution to the weekly coding challenge marks two things for me:
+- it was the first coding session in a while where i created something of my own choosing (uni homework took up all my energy for coding for the past time)
+- for the first time in a while i just started with a rough idea of what i wanted and let things evolve from there (fittingly and quite poetically i was listening to a music compilation called 'trust the process')
+	in the past weeks i struggled with coming up with a "good enough idea" for the challenge and giving myself a push and just starting felt nice and turned out quite good i feel like.
 
-let directions = [[1, 0], [0, 1], [-1,0], [0,-1], [1, 1], [-1, 1], [1, -1], [-1, -1]];
-let raster = [[1, 0, 0, 0, 0], [1, 1, 1, 0, 0], [0, 0, 1, 0, 0], [1, 1, 0, 1, 0], [1, 0, 0, 0, 1]];
+now for the theme:
+the first thing that came to mind when i read the theme was to produce something. Have some object that goes through a production cycle with multiple steps, each transforming the object in some way.
+I started out with a simple circle that morphes into a square and back, from there the idea of 'producing' something turned into endlessly transforming the object into the same shapes and back again, forever the same but forever changing (how poetic)
+But one object wasnt enough, so i tiled the drawing to span the entire canvas, arranged them in a slight angle to give them a bit of an interesting touch and also made the objects move along one axis.
+One could iterpret this moving along as a production belt in a factory. An endless belt of forever transforming objects that are stuck in an endless loop.
+A truely pointless creation.
 
+In all this repetitiveness, a singular red object traverses the screen in sync with its other gray siblings. 
+While creating this sketch it felt a bit boring in this very gray picture and having a singular object begging for attention not only give the eyes something to focus on,
+it also gives the piece another dimension by breking up the one cycle loop and making it seem like something is actually progressing.
+That is until one realizes that the red object too is stuck in a big cycle, trapped like all the others, pointlessly morphed like all the others.
+*/
 
-let rows = 5
-let cols = 5
+const numPoints = 160;
+const meanRad = 100;
 
-let radius = 10 
-let margin = 5
+//const strokeCol = '#F3EFE0';
+const backgroundCol = '#F3EFE0'
+let fillCol1 = '#434242';
+let fillCol2 = '#222222';
 
-function fxrand() { return Math.random(); } // fx hash future proofing
+const speed = 0.5;
+
+let stages = [];
+let currentStage = 0;
+let nextStage = 1;
+
+let specialX = -5;
+
+let t = 0;
 
 function setup() {
-	randomSeed(int(fxrand()*987654321)); // fx hash future proofing
-	w = min(windowWidth, windowHeight);
-	createCanvas(w, w);
-	margin = 0.1 * width;
-	radius = (width - 2 * margin) / cols / 2;
+	describe("gray squares tile the screen at a sligth angle. they move in steps while morphing into spheres and back into squares. One square is different then the others in that it is colored bright red")
+	createCanvas(windowWidth, windowHeight);
 	
-	colorMode(HSL);
-	background(39, 45, 90);
+	//strokeWeight(5);
+	//stroke(strokeCol);
 	noStroke();
-	fill(269, 61, 18, 0.1);
+	fill(fillCol1);
 	
-	noLoop();
-	
-	rectMode(RADIUS);
-	angleMode(DEGREES); 
+	stages = initStages();
 }
-
-
-function draw_raster(raster) {
-	for (let row = 0; row < rows; row++) {
-		for (let col = 0; col < cols; col++) {
-			let x = margin + radius + col * 2 * radius;
-			let y = margin + radius + row * 2 * radius;
-			
-			if (raster[row][col] == 1) {
-				circle(x, y, 2 * radius);
-
-				if (col + 1 < cols) {
-					if (raster[row][col + 1] == 1) {
-						rect(x + radius, y, radius);
-					}
-				}
-
-				if (row + 1 < rows) {
-					if (raster[row + 1][col] == 1) {
-						rect(x, y + radius, radius);
-					}
-				}
-				
-				if ((row + 1 < rows) && (col + 1 < cols) && true) {
-					if (raster[row + 1][col + 1] == 1) {
-						push();
-						translate(x, y);
-						beginShape();
-						vertex(0, radius);
-						for (let angle = -90; angle <= 0; angle += 1) {
-							vertex(radius * cos(angle), radius * (2 + sin(angle)));
-						}
-						vertex(radius, 2 * radius);
-						vertex(2 * radius, radius);
-						for (let angle = 90; angle <= 180; angle += 1) {
-							vertex(radius * (2 + cos(angle)), radius * (0 + sin(angle)));
-						}
-						vertex(radius, 0);
-						endShape();
-						pop();
-					}
-				}
-				if ((row + 1 < rows) && (col - 1 >= 0)) {
-					if (raster[row + 1][col - 1] == 1) {
-						push();
-						translate(x, y);
-						beginShape();
-						vertex(-radius, 0);
-						for (let angle = 0; angle <= 90; angle += 1) {
-							vertex(radius * (-2 + cos(angle)), radius * (0 + sin(angle)));
-						}
-						vertex(-2 * radius, radius);
-						vertex(-radius, 2 * radius);
-						for (let angle = 180; angle <= 270; angle += 1) {
-							vertex(radius * (0 + cos(angle)), radius * (2 + sin(angle)));
-						}
-						vertex(0, radius);
-						endShape();
-						pop();
-					}
-				}
-			}
-		}
-	}
-}
-
-function create_raster() {
-	// create empty raster
-	var raster = new Array(rows);
-	for (var i = 0; i < raster.length; i++) {
-		raster[i] = new Array(cols);
-	}
-	
-	for (let row = 0; row < raster.length; row++) {
-		for (let col = 0; col < raster[row].length; col++) {
-		raster[row][col] = 0;
-		}
-	}
-	
-	// fill the raster
-	let row = Math.floor(fxrand() * rows);
-	let col = Math.floor(fxrand() * cols);
-	
-	for (let i = 0; i < rows * cols / 4; i++) {
-		let row = Math.floor(fxrand() * rows);
-		let col = Math.floor(fxrand() * cols);
-		raster[row][col] = 1;
-		//let neighborhood = Array();
-		//for (let dir of directions) {
-			//console.log(dir);
-		//} 
-	}
-	
-	return raster;
-}
-
 
 function draw() {
-	let colors = [color('#F1E9DA'), color('#2E294E'), color('#541388'), color('#FFD400'), color('#D90368')]
+	translate(width / 2, height / 2);
+	background(backgroundCol);
 	
-	for (let c of colors) {
-		fill(c);
-		stroke(c);
-		raster = create_raster();
-		draw_raster(raster);
+	t += deltaTime * 0.001 * speed;
+	
+	if(t >= 1) {
+		if(nextStage >= stages.length - 1) {
+			currentStage = 0;
+			nextStage = 1;
+		} else {
+			currentStage = nextStage;
+			nextStage = (nextStage + 1) % stages.length;
+		}
+		t -= 1;
+		
+		let temp = fillCol1;
+		fillCol1 = fillCol2;
+		fillCol2 = temp;
+		
+		if(specialX >= width / (meanRad * 4) - 1) {
+			specialX = - round(width / (meanRad * 4) + 1);
+		}
+		
+		specialX++;
+		
+		//console.log(specialX + " | " + (width / (meanRad * 4) - 1));
+	}
+	//console.log(t + " c: "  + currentStage + " | n: " + nextStage)
+	
+	scaledT = -cos(t * PI) * 0.5 + 0.5;
+	
+	//fill(lerpColor(color(fillCol1), color(fillCol2), easings[currentStage](scaledT)));
+	
+	let points = getPoints();
+	let numX = width / (meanRad * 4);
+	let numY = height / (meanRad * 4);
+	for(let y = - floor(numY); y <= numY; y++) {
+		for(let x = - floor(numX); x <= numX; x++) {
+			let dynamicOffset = scaleMoveAnimation(t) * (abs(y % 2 == 0)? 1 : -1);
+			fill((x + y) % 2 == 0? fillCol1 : fillCol2);
+			if(x == specialX && y == 0) {
+				fill('red');
+			}
+			drawShape((x + dynamicOffset) * meanRad * 4, (4 * y + x + dynamicOffset) * meanRad, points);
+		}
 	}
 }
 
+function getPoints() {
+	let points = [];
+	
+	let stageA = stages[currentStage];
+	let stageB = stages[nextStage];
+		
+	let easedT = easings[currentStage](scaledT);
+	
+	for(let i = 0; i < numPoints; i++) {
+		pA = stageA[i];
+		pB = stageB[i];
+		let delta = p5.Vector.sub(pB, pA);
+		
+		points.push(p5.Vector.add(pA, p5.Vector.mult(delta, easedT)));
+	}
+		
+	return points;
+}
+
+function drawShape(dx, dy, points) {
+	beginShape();
+	for(let i = 0; i < points.length; i++) {
+		vertex(points[i].x + dx, points[i].y + dy);
+	}
+	endShape(CLOSE);
+}
+
+function scaleMoveAnimation(x) {
+	let moveWindow = 0.25;
+	if(x < 0) {
+		return 0;
+	} else if(x < moveWindow) {
+		return -cos(x * PI / moveWindow) * 0.5 + 0.5;
+	} else {
+		return 1;
+	}
+}
     </script>
 </body>
 </html>
