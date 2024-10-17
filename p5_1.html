@@ -13,122 +13,558 @@
 <body>
     <script>
 
-const numPoints = 160;
-const meanRad = 100;
+// Truchet Pipes
+// For the #WCCChallenge << Falling >> (join the discord! https://discord.gg/S8c7qcjw2b)
 
-//const strokeCol = '#F3EFE0';
-const backgroundCol = '#F3EFE0'
-let fillCol1 = '#434242';
-let fillCol2 = '#222222';
+/*
+ * Playing around with physics engine and truchet tiles.
+ * I have been wanting to build some sort of generative Rube-Goldberg machine, this is a first approach. Just some circles falling inside a truchet tiling.
+ */
+let cw, ch
+let hexSize = 120 // Math.floor(80 + Math.random(40))
+let wallWidth = hexSize / 12
+let ballSize = hexSize / 10
+let h, w
+let tiles = {}
+let types = ["A", "B", "C", "D"]
+let maxParticles = 120
+let BG_COLOR, WALL_COLOR, ACTIVE_COLOR, BALL_COLORS
+let rotationFrames = 60
 
-const speed = 0.5;
+let palettes = [
+  ["#f7f3f2", "#0a0a0a", "#0a0a7e", "#0077e1", "#f5d216", "#fc3503"],
+  ["#e2f693", "#2D3023", "#155A63", "#7D8755", "#40A345", "#c5d419", "#63991f"],
+  ["#fffbe6", "#050505", "#6e8a2c", "#29ac9f", "#14976b", "#b3dce0", "#62b6de", "#2b67af", "#f589a3", "#ef562f", "#fc8405", "#f9d531", ],
+  ["#080b0f", "#e17e50", "#f4c435", "#217b25", "#6a40cb", "#efc807"],
+  ["#3076B8", "#b5e2fa", "#f9f7f3", "#0A1D7D", "#60A120", "#b5e2fa"],
+  ["#4b296b", "#d74e09", "#ff9757", "#3891A6", "#FFFFFF", "#9ce37d"],
+]
+let _DEBUG = false
 
-let stages = [];
-let currentStage = 0;
-let nextStage = 1;
+let Engine = Matter.Engine,
+  World = Matter.World,
+  Bodies = Matter.Bodies,
+  Body = Matter.Body,
+  Runner = Matter.Runner,
+  Composite = Matter.Composite,
+  Render = Matter.Render,
+  Events = Matter.Events
 
-let specialX = -5;
-
-let t = 0;
+let engine, world, particles
 
 function setup() {
-	describe("gray squares tile the screen at a sligth angle. they move in steps while morphing into spheres and back into squares. One square is different then the others in that it is colored bright red")
-	createCanvas(windowWidth, windowHeight);
-	
-	//strokeWeight(5);
-	//stroke(strokeCol);
-	noStroke();
-	fill(fillCol1);
-	
-	stages = initStages();
+  let palette = random(palettes)
+  BG_COLOR = palette[0]
+  WALL_COLOR = palette[1]
+  ACTIVE_COLOR = palette[2]
+  BALL_COLORS = palette.slice(3)
+  cw = windowWidth
+  ch = windowHeight
+
+  createCanvas(cw, ch)
+  background(BG_COLOR)
+  strokeCap(SQUARE)
+
+  particles = []
+
+  h = hexSize * sin(PI / 3) * 2
+  w = hexSize * (3 / 2)
+
+  let sx = floor(cw / 2 / w)
+  let sy = floor(ch / 2 / h)
+
+  for (let x = -sx - 1; x <= sx + 1; x++) {
+    for (let y = -sy - 1; y <= sy + 1; y++) {
+      let hx = x * w
+      let hy = y * h
+      if (x % 2 === 0) {
+        hy += h / 2
+      }
+      let tile = {
+        center: [hx, hy],
+        x, y,
+        type: random(types),
+        // type: 'D'
+      }
+      let walls = getHexWalls(tile)
+      tile.corners = walls.corners
+      tile.walls = walls.polygons
+      let bodies = []
+      let rotation = (PI / 3) * floor(random(6))
+      for (let wall of walls.polygons) {
+        let poly = [...wall]
+        decomp.makeCCW(poly)
+        let convexPolygons = decomp.quickDecomp(poly)
+        for (let convexPolygon of convexPolygons) {
+          let poly = convexPolygon.map((p) => ({ x: p[0], y: p[1] }))
+          let bbox = getBbox(poly)
+          let body = Bodies.fromVertices(
+            bbox.centerX + hx + cw / 2,
+            bbox.centerY + hy + ch / 2,
+            poly,
+            {
+              isStatic: true,
+              friction: 0.3,
+              restitution: 2,
+            }
+          )
+          Body.rotate(body, rotation, { x: hx + cw / 2, y: hy + ch / 2 })
+          bodies.push(body)
+        }
+      }
+      let hexPoly = walls.corners.map((p) => ({ x: p[0], y: p[1] }))
+      let hexBody = Bodies.fromVertices(hx + cw / 2, hy + ch / 2, hexPoly, {
+        isStatic: true,
+        isSensor: true,
+      })
+
+      tile.bodies = bodies
+      tile.hexBody = hexBody
+      tile.rotation = rotation
+      tiles[`${x},${y}`] = tile
+    }
+  }
+
+  engine = Engine.create()
+  world = engine.world
+  engine.gravity.y = 1.5
+  Runner.run(engine)
+
+  for (let tile of Object.values(tiles)) {
+    World.add(world, tile.bodies)
+    World.add(world, tile.hexBody)
+  }
+  addParticles(100)
+}
+
+let addParticles = (n) => {
+  for (let i = 0; i < n; i++) {
+    if (particles.length >= maxParticles) {
+      break
+    }
+    let particle = Bodies.circle(
+      random(cw),
+      random(ch / 2),
+      random((ballSize * 2) / 3, ballSize),
+      {
+        friction: 0.2,
+        restitution: 0.9,
+      }
+    )
+    particle.__color = random(BALL_COLORS)
+    World.add(world, particle)
+    particles.push(particle)
+  }
+}
+
+let cleanupParticles = () => {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    let p = particles[i]
+    if ( p.position.y > ch || p.position.x < 0 || p.position.x > cw || p.position.y < 0) {
+      World.remove(world, p)
+      particles.splice(i, 1)
+    }
+  }
 }
 
 function draw() {
-	translate(width / 2, height / 2);
-	background(backgroundCol);
-	
-	t += deltaTime * 0.001 * speed;
-	
-	if(t >= 1) {
-		if(nextStage >= stages.length - 1) {
-			currentStage = 0;
-			nextStage = 1;
-		} else {
-			currentStage = nextStage;
-			nextStage = (nextStage + 1) % stages.length;
-		}
-		t -= 1;
-		
-		let temp = fillCol1;
-		fillCol1 = fillCol2;
-		fillCol2 = temp;
-		
-		if(specialX >= width / (meanRad * 4) - 1) {
-			specialX = - round(width / (meanRad * 4) + 1);
-		}
-		
-		specialX++;
-		
-		//console.log(specialX + " | " + (width / (meanRad * 4) - 1));
-	}
-	//console.log(t + " c: "  + currentStage + " | n: " + nextStage)
-	
-	scaledT = -cos(t * PI) * 0.5 + 0.5;
-	
-	//fill(lerpColor(color(fillCol1), color(fillCol2), easings[currentStage](scaledT)));
-	
-	let points = getPoints();
-	let numX = width / (meanRad * 4);
-	let numY = height / (meanRad * 4);
-	for(let y = - floor(numY); y <= numY; y++) {
-		for(let x = - floor(numX); x <= numX; x++) {
-			let dynamicOffset = scaleMoveAnimation(t) * (abs(y % 2 == 0)? 1 : -1);
-			fill((x + y) % 2 == 0? fillCol1 : fillCol2);
-			if(x == specialX && y == 0) {
-				fill('red');
-			}
-			drawShape((x + dynamicOffset) * meanRad * 4, (4 * y + x + dynamicOffset) * meanRad, points);
-		}
-	}
+  background(BG_COLOR)
+  cleanupParticles()
+  if (frameCount % 10 === 0) {
+    addParticles(5)
+  }
+  for (let tile of Object.values(tiles)) {
+    push()
+    if (_DEBUG) {
+      noFill()
+      stroke(tile.active ? ACTIVE_COLOR : WALL_COLOR)
+      strokeWeight(1)
+      for (let body of tile.bodies) {
+        beginShape()
+        for (let v of body.vertices) {
+          vertex(v.x, v.y)
+        }
+        endShape(CLOSE)
+      }
+
+      // Draw hexagon
+      noFill()
+      stroke(WALL_COLOR)
+      strokeWeight(1)
+      beginShape()
+      for (let v of tile.hexBody.vertices) {
+        vertex(v.x, v.y)
+      }
+      endShape(CLOSE)
+      updateTile(tile)
+    } else {
+      translate(cw / 2, ch / 2)
+      translate(...tile.center)
+      rotate(tile.rotation)
+      noFill()
+
+      stroke(WALL_COLOR + '80')
+      strokeWeight(wallWidth + 5)
+      drawTile(tile.type, hexSize)
+
+      stroke(BG_COLOR)
+      strokeWeight(wallWidth)
+      drawTile(tile.type, hexSize)
+
+      strokeWeight(wallWidth - 5)
+      stroke(tile.active ? ACTIVE_COLOR : WALL_COLOR)
+      drawTile(tile.type, hexSize)
+
+      updateTile(tile)
+    }
+    pop()
+  }
+  for (let p of particles) {
+    fill(p.__color)
+    noStroke()
+    circle(p.position.x, p.position.y, p.circleRadius * 1.8)
+  }
+  // handleMouse()
+  if (frameCount % 5 === 0) {
+    let tile = random(Object.values(tiles))
+    while (tile.isRotating) {
+      tile = random(Object.values(tiles))
+    }
+    startRotation(tile)
+  }
 }
 
-function getPoints() {
-	let points = [];
-	
-	let stageA = stages[currentStage];
-	let stageB = stages[nextStage];
-		
-	let easedT = easings[currentStage](scaledT);
-	
-	for(let i = 0; i < numPoints; i++) {
-		pA = stageA[i];
-		pB = stageB[i];
-		let delta = p5.Vector.sub(pB, pA);
-		
-		points.push(p5.Vector.add(pA, p5.Vector.mult(delta, easedT)));
-	}
-		
-	return points;
+let startRotation = (tile) => {
+  tile.isRotating = true
+  tile.rotatingFrames = rotationFrames
+  tile.rotationDirection = random([-1, 1])
+  tile.originalRotation = tile.rotation
+  tile.active = true
 }
 
-function drawShape(dx, dy, points) {
-	beginShape();
-	for(let i = 0; i < points.length; i++) {
-		vertex(points[i].x + dx, points[i].y + dy);
-	}
-	endShape(CLOSE);
+let updateTile = (tile) => {
+  if (tile.isRotating) {
+    // let angle = (PI / 3 / rotationFrames) * tile.rotationDirection
+    let newAngle = (1 - easeRotation(tile.rotatingFrames / rotationFrames)) * (PI / 3) * tile.rotationDirection
+    let angle = newAngle - tile.deltaRotation
+    tile.rotation += angle
+    tile.deltaRotation = newAngle
+    tile.rotatingFrames--
+    if (tile.rotatingFrames === 0) {
+      tile.isRotating = false
+      tile.active = false
+      tile.rotation = tile.originalRotation + (PI / 3 * tile.rotationDirection)
+    }
+    for (let body of tile.bodies) {
+      Body.rotate(body, angle, {
+        x: tile.center[0] + cw / 2,
+        y: tile.center[1] + ch / 2,
+      })
+    }
+  } else {
+    tile.deltaRotation = 0
+  }
 }
 
-function scaleMoveAnimation(x) {
-	let moveWindow = 0.25;
-	if(x < 0) {
-		return 0;
-	} else if(x < moveWindow) {
-		return -cos(x * PI / moveWindow) * 0.5 + 0.5;
-	} else {
-		return 1;
-	}
+let easeRotation = (x) => {
+  return x < 0.5 ? 8 * x * x * x * x : 1 - Math.pow(-2 * x + 2, 4) / 2
 }
+
+let ss = (points) => {
+  beginShape()
+  for (let p of points) {
+    vertex(...p)
+  }
+  endShape(CLOSE)
+}
+
+let __corners, __midPoints
+// Get the points of a hexagon with radius hexSize. Use memoization since points are always the same.
+let getHexPoints = (hexSize) => {
+  if (__corners) {
+    return { corners: __corners, midpoints: __midPoints }
+  }
+  let corners = []
+  for (let i = 0; i < 6; i++) {
+    let angle = (PI / 3) * i
+    let px = hexSize * cos(angle)
+    let py = hexSize * sin(angle)
+    corners.push([px, py])
+  }
+  let midpoints = []
+  for (let i = 0; i < 6; i++) {
+    let p1 = corners[i]
+    let p2 = corners[(i + 1) % 6]
+    midpoints.push([
+      [lerp(p1[0], p2[0], 1 / 3), lerp(p1[1], p2[1], 1 / 3)],
+      [lerp(p1[0], p2[0], 2 / 3), lerp(p1[1], p2[1], 2 / 3)],
+    ])
+  }
+  __corners = corners
+  __midPoints = midpoints
+  return { corners, midpoints }
+}
+
+let __intersectionPoints
+let getIntersectionPoints = (hexSize) => {
+  if (__intersectionPoints) {
+    return __intersectionPoints
+  }
+  let hh = (hexSize * 2) / 3
+  let h_1 = hexSize * 2 + hh
+  let h_2 = (hexSize + hh) * 2
+  let { corners, midpoints } = getHexPoints(hexSize)
+  let p1, q1, r1, s1, p2, q2, r2, s2
+  p1 = getIntersection( 0, h, h_1 / 2, midpoints[4][0], midpoints[1][1])
+  q1 = getIntersection( 0, h, h_1 / 2, midpoints[1][0], midpoints[4][1])
+  r1 = getIntersection( 0, h, h_2 / 2, midpoints[4][0], midpoints[1][1])
+  s1 = getIntersection( 0, h, h_2 / 2, midpoints[1][0], midpoints[4][1])
+  p2 = getIntersection( 0, -h, h_1 / 2, midpoints[1][0], midpoints[4][1])
+  q2 = getIntersection( 0, -h, h_1 / 2, midpoints[4][0], midpoints[1][1])
+  r2 = getIntersection( 0, -h, h_2 / 2, midpoints[1][0], midpoints[4][1])
+  s2 = getIntersection( 0, -h, h_2 / 2, midpoints[4][0], midpoints[1][1])
+  __intersectionPoints = [ p1, q1, r1, s1, p2, q2, r2, s2 ]
+  return __intersectionPoints
+}
+
+// Given a circle with center (cx, cy) and radius r, and a line from pointA to pointB,
+// return the intersection point(s) of the line and the circle.
+let getIntersection = (cx, cy, radius, pointA, pointB) => {
+  let dx = pointB[0] - pointA[0]
+  let dy = pointB[1] - pointA[1]
+  let A = dx * dx + dy * dy
+  let B = 2 * (dx * (pointA[0] - cx) + dy * (pointA[1] - cy))
+  let C =
+    (pointA[0] - cx) * (pointA[0] - cx) +
+    (pointA[1] - cy) * (pointA[1] - cy) -
+    radius * radius
+  let det = B * B - 4 * A * C
+  // Get the two solutions for the line intersection, and return the closest to the second point
+  let t1 = (-B + sqrt(det)) / (2 * A)
+  let t2 = (-B - sqrt(det)) / (2 * A)
+  let ex1 = pointA[0] + t1 * dx
+  let ey1 = pointA[1] + t1 * dy
+  let ex2 = pointA[0] + t2 * dx
+  let ey2 = pointA[1] + t2 * dy
+  if (dist(ex1, ey1, pointB[0], pointB[1]) < dist(ex2, ey2, pointB[0], pointB[1])) {
+    return [ex1, ey1]
+  } else {
+    return [ex2, ey2]
+  }
+}
+
+let pointToAngle = (cx, cy, px, py) => {
+  let angle = atan2(py - cy, px - cx)
+  if (angle < 0) {
+    angle += TAU
+  }
+  return angle
+}
+
+let drawTile = (type, hexSize) => {
+  let hh = (hexSize * 2) / 3
+  let h_1 = hexSize * 2 + hh
+  let h_2 = (hexSize + hh) * 2
+  let { corners, midpoints } = getHexPoints(hexSize)
+  let ip = getIntersectionPoints(hexSize)
+  switch (type) {
+    case "A":
+      arc(...corners[0], hh, hh, (2 * PI) / 3, (4 * PI) / 3)
+      arc(...corners[0], hh * 2, hh * 2, (2 * PI) / 3, (4 * PI) / 3)
+      arc(...corners[3], hh, hh, (5 * PI) / 3, PI / 3)
+      arc(...corners[3], hh * 2, hh * 2, (5 * PI) / 3, PI / 3)
+      line(...midpoints[1][0], ...midpoints[4][1])
+      line(...midpoints[4][0], ...midpoints[1][1])
+      break
+    case "B":
+      arc(...corners[0], hh, hh, (2 * PI) / 3, (4 * PI) / 3)
+      arc(...corners[0], hh * 2, hh * 2, (2 * PI) / 3, (4 * PI) / 3)
+      arc(...corners[2], hh, hh, (4 * PI) / 3, 0)
+      arc(...corners[2], hh * 2, hh * 2, (4 * PI) / 3, 0)
+      arc(...corners[4], hh, hh, 0, (2 * PI) / 3)
+      arc(...corners[4], hh * 2, hh * 2, 0, (2 * PI) / 3)
+      break
+    case "C":
+      arc(0, h, h_1, h_1, (4 * PI) / 3, pointToAngle(0, h, ...ip[0]))
+      arc(0, h, h_1, h_1, pointToAngle(0, h, ...ip[1]), (5 * PI) / 3)
+      arc(0, h, h_2, h_2, (4 * PI) / 3, pointToAngle(0, h, ...ip[2]))
+      arc(0, h, h_2, h_2, pointToAngle(0, h, ...ip[3]), (5 * PI) / 3)
+      arc(0, -h, h_1, h_1, PI / 3, pointToAngle(0, -h, ...ip[4]))
+      arc(0, -h, h_1, h_1, pointToAngle(0, -h, ...ip[5]), (2 * PI) / 3)
+      arc(0, -h, h_2, h_2, PI / 3, pointToAngle(0, -h, ...ip[6]))
+      arc(0, -h, h_2, h_2, pointToAngle(0, -h, ...ip[7]), (2 * PI) / 3)
+      line(...midpoints[1][0], ...midpoints[4][1])
+      line(...midpoints[4][0], ...midpoints[1][1])
+      break
+    case "D":
+      arc(0, h, h_1, h_1, (4 * PI) / 3, (5 * PI) / 3)
+      arc(0, h, h_2, h_2, (4 * PI) / 3, (5 * PI) / 3)
+      arc(0, -h, h_1, h_1, PI / 3, (2 * PI) / 3)
+      arc(0, -h, h_2, h_2, PI / 3, (2 * PI) / 3)
+      line(...midpoints[1][0], ...ip[1])
+      line(...midpoints[1][1], ...ip[0])
+      line(...ip[2], ...ip[7])
+      line(...ip[3], ...ip[6])
+      line(...midpoints[4][0], ...ip[5])
+      line(...midpoints[4][1], ...ip[4])
+      break
+    case "E":
+      arc(...corners[0], hh, hh, (2 * PI) / 3, (4 * PI) / 3)
+      arc(...corners[0], hh * 2, hh * 2, (2 * PI) / 3, (4 * PI) / 3)
+      arc(-w, -h / 2, h_1, h_1, 0, PI / 3)
+      arc(-w, -h / 2, h_2, h_2, 0, PI / 3)
+      arc(-w, h / 2, h_1, h_1, (5 * PI) / 3, 0)
+      arc(-w, h / 2, h_2, h_2, (5 * PI) / 3, 0)
+      break
+  }
+}
+
+let drawArcWall = (x, y, radius, startAngle, endAngle) => {
+  arc(x, y, radius * 2, radius * 2, startAngle, endAngle)
+}
+
+let getHexWalls = ({ type }) => {
+  let hh = (hexSize * 2) / 3
+  let h_1 = (hexSize * 2 + hh) / 2
+  let h_2 = hexSize + hh
+  let { corners, midpoints } = getHexPoints(hexSize)
+  let polygons = []
+  let ip = getIntersectionPoints(hexSize)
+  switch (type) {
+    case "A":
+      polygons.push(arcWall(...corners[0], hh / 2, (2 * PI) / 3, (4 * PI) / 3, wallWidth))
+      polygons.push(arcWall(...corners[0], hh, (2 * PI) / 3, (4 * PI) / 3, wallWidth))
+      polygons.push(arcWall(...corners[3], hh / 2, (5 * PI) / 3, PI / 3, wallWidth)
+      )
+      polygons.push(arcWall(...corners[3], hh, (5 * PI) / 3, PI / 3, wallWidth))
+      polygons.push(lineWall(...midpoints[1][0], ...midpoints[4][1], wallWidth))
+      polygons.push(lineWall(...midpoints[4][0], ...midpoints[1][1], wallWidth))
+      break
+    case "B":
+      polygons.push(arcWall(...corners[0], hh / 2, (2 * PI) / 3, (4 * PI) / 3, wallWidth))
+      polygons.push(arcWall(...corners[0], hh, (2 * PI) / 3, (4 * PI) / 3, wallWidth))
+      polygons.push(arcWall(...corners[2], hh / 2, (4 * PI) / 3, 0, wallWidth))
+      polygons.push(arcWall(...corners[2], hh, (4 * PI) / 3, 0, wallWidth))
+      polygons.push(arcWall(...corners[4], hh / 2, 0, (2 * PI) / 3, wallWidth))
+      polygons.push(arcWall(...corners[4], hh, 0, (2 * PI) / 3, wallWidth))
+      break
+    case "C":
+      polygons.push(arcWall(0, h, h_1, (4 * PI) / 3, pointToAngle(0, h, ...ip[0]), wallWidth))
+      polygons.push(arcWall(0, h, h_1, pointToAngle(0, h, ...ip[1]), (5 * PI) / 3, wallWidth))
+      polygons.push(arcWall(0, h, h_2, (4 * PI) / 3, pointToAngle(0, h, ...ip[2]), wallWidth))
+      polygons.push(arcWall(0, h, h_2, pointToAngle(0, h, ...ip[3]), (5 * PI) / 3, wallWidth))
+      polygons.push(arcWall(0, -h, h_1, PI / 3, pointToAngle(0, -h, ...ip[4]), wallWidth))
+      polygons.push(arcWall(0, -h, h_1, pointToAngle(0, -h, ...ip[5]), (2 * PI) / 3, wallWidth))
+      polygons.push(arcWall(0, -h, h_2, PI / 3, pointToAngle(0, -h, ...ip[6]), wallWidth))
+      polygons.push(arcWall(0, -h, h_2, pointToAngle(0, -h, ...ip[7]), (2 * PI) / 3, wallWidth))
+      polygons.push(lineWall(...midpoints[1][0], ...midpoints[4][1], wallWidth))
+      polygons.push(lineWall(...midpoints[4][0], ...midpoints[1][1], wallWidth))
+      break
+    case "D":
+      polygons.push(arcWall(0, h, h_1, (4 * PI) / 3, (5 * PI) / 3, wallWidth))
+      polygons.push(arcWall(0, h, h_2, (4 * PI) / 3, (5 * PI) / 3, wallWidth))
+      polygons.push(arcWall(0, -h, h_1, PI / 3, (2 * PI) / 3, wallWidth))
+      polygons.push(arcWall(0, -h, h_2, PI / 3, (2 * PI) / 3, wallWidth))
+      polygons.push(lineWall(...midpoints[1][0], ...ip[1], wallWidth))
+      polygons.push(lineWall(...midpoints[1][1], ...ip[0], wallWidth))
+      polygons.push(lineWall(...ip[2], ...ip[7], wallWidth))
+      polygons.push(lineWall(...ip[3], ...ip[6], wallWidth))
+      polygons.push(lineWall(...midpoints[4][0], ...ip[5], wallWidth))
+      polygons.push(lineWall(...midpoints[4][1], ...ip[4], wallWidth))
+      break
+    case "E":
+      polygons.push(arcWall(...corners[0], hh / 2, (2 * PI) / 3, (4 * PI) / 3, wallWidth))
+      polygons.push(arcWall(...corners[0], hh, (2 * PI) / 3, (4 * PI) / 3, wallWidth))
+      polygons.push(arcWall(-w, -h / 2, h_1, 0, PI / 3, wallWidth))
+      polygons.push(arcWall(-w, -h / 2, h_2, 0, PI / 3, wallWidth))
+      polygons.push(arcWall(-w, h / 2, h_1, (5 * PI) / 3, 0, wallWidth))
+      polygons.push(arcWall(-w, h / 2, h_2, (5 * PI) / 3, 0, wallWidth))
+      break
+  }
+  return { corners, polygons }
+}
+
+let arcToPoints = (x, y, radius, startAngle, endAngle, res = PI / 10) => {
+  if (endAngle < startAngle) {
+    startAngle -= TAU
+  }
+  let points = []
+  for (let angle = startAngle; angle < endAngle + res; angle += res) {
+    if (angle > endAngle) {
+      angle = endAngle
+    }
+    let px = x + radius * cos(angle)
+    let py = y + radius * sin(angle)
+    points.push([px, py])
+  }
+  return points
+}
+
+let arcWall = (x, y, radius, startAngle, endAngle, width, res = PI / 10) => {
+  let points = []
+  points.push(...arcToPoints(x, y, radius - width / 2, startAngle, endAngle, res))
+  points.push(...arcToPoints(x, y, radius + width / 2, startAngle, endAngle, res).reverse())
+  return points
+}
+
+let lineWall = (x1, y1, x2, y2, width) => {
+  let points = []
+  let angle = atan2(y2 - y1, x2 - x1)
+  let dx = (width / 2) * cos(angle + PI / 2)
+  let dy = (width / 2) * sin(angle + PI / 2)
+  points.push([x1 + dx, y1 + dy])
+  points.push([x1 - dx, y1 - dy])
+  points.push([x2 - dx, y2 - dy])
+  points.push([x2 + dx, y2 + dy])
+  return points
+}
+
+let getBbox = (points) => {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (let p of points) {
+    minX = min(minX, p.x || p[0])
+    minY = min(minY, p.y || p[1])
+    maxX = max(maxX, p.x || p[0])
+    maxY = max(maxY, p.y || p[1])
+  }
+  return {
+    x: minX, y: minY,
+    width: maxX - minX, height: maxY - minY,
+    centerX: (minX + maxX) / 2, centerY: (minY + maxY) / 2,
+  }
+}
+
+function handleMouse(force = false) {
+  for (let tile of Object.values(tiles)) {
+    let hexBody = tile.hexBody
+    if (Matter.Vertices.contains(hexBody.vertices, { x: mouseX, y: mouseY })) {
+      if (!tile.active || force) {
+        tile.active = true
+        tile.rotation += PI / 3
+        for (let body of tile.bodies) {
+          Body.rotate(body, PI / 3, {
+            x: tile.center[0] + cw / 2,
+            y: tile.center[1] + ch / 2,
+          })
+        }
+      } else {
+      }
+    } else {
+      tile.active = false
+    }
+  }
+}
+
+function mouseClicked() {
+  // handleMouse(true)
+}
+
+function keyPressed () {
+  if (keyCode === 68) { // D
+    _DEBUG = !_DEBUG
+  }
+}
+
     </script>
 </body>
 </html>
