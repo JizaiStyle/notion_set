@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My p5.js Sketch</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <style>
+        body { margin: 0; padding: 0; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+    <script>
+/**
+Besides being a response to NYU Creative Coding HM7 about Lissajous curves, this work is also my response to "the clock":
+"a project that would require their computational design students to develop a dynamic representation of time", mentioned in:
+https://engineering.nyu.edu/news/new-chapter-creative-coding-nyu-tandon
+*/
+
+function setup() {
+  createCanvas(600, 600);
+  frameRate(60);
+	
+	// define the colors
+  COLOR_BACK = color("#F9E79F");
+  COLOR_TEXT = color("#6C3483");
+  COLOR_START = color("#6495ED");
+  COLOR_END = color("#DE3163");
+	
+	// define text styles
+  textSize(50);
+  textFont("Georgia");
+  textAlign(CENTER);
+	noStroke();
+}
+
+function draw() {
+  background(COLOR_BACK);
+  translate(width/2, height/2);
+	
+	// dispay time of the day in the center of the canvas
+  fill(COLOR_TEXT);
+  text(hour()+"h "+minute()+"m "+second()+"s", 0, 0);
+
+	// define variables for trigonomitric functions used in Lissajous curves
+  var amplitude1 = width/3;
+  var amplitude2 = height/3;
+  var periodWeight1 = 1/(hour()+24);
+  var periodWeight2 = 1/(minute()+60);
+  var periodWeight3 = 1/(second()+60);
+	
+  for(var i=0; i < 3600; i++){
+		// Lissajous curves coordinates
+    var x = amplitude1*sin(periodWeight1*i);
+    var y = amplitude2*sin(periodWeight2*i);
+    
+		// animate the fill color using sin function
+    let lerpWeight=(sin(periodWeight3*i)+1)/2;
+    fill(lerpColor(COLOR_START, COLOR_END, lerpWeight));
+		
+		// represent Lissajous curves with dot curves
+		circle(x,y,2);
+    
+		// draw multiple shapes along Lissajous curves
+    for(let j=1; j<=10; j++) {
+      if (frameCount%3600 == i+j) circle(x, y, 40-j*3);
+    }
+  }
+}
+    </script>
+</body>
+</html>
