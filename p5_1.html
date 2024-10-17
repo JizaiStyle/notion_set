@@ -1,124 +1,144 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My p5.js Sketch</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
-    <style>
-        body { margin: 0; padding: 0; }
-        canvas { display: block; }
-    </style>
+  <meta charset="UTF-8">
+  <title>Tree Shapes with p5.js</title>
+  <!-- Include p5.js library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.2/p5.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden; /* Hide scrollbars */
+      background-color: #FEF3E0; /* Set initial background color */
+    }
+  </style>
 </head>
 <body>
-    <script>
+  <script>
+    // Define color palettes
+    let palettes = [
+      ["#bdd7d3", "#b8c8be", "#91958b", "#465b5e", "#543933", "#8e1623", "#f28c7a", "#eee1ca"],
+      ["#451c06", "#743212", "#9c400a", "#f97e01", "#929e78", "#13b2bc", "#0c8194"],
+      ["#3d4635", "#5a734c", "#8e472c", "#a7713b", "#252b21", "#304543", "#b18961", "#cab68c"]
+    ];
 
-let palettes=[["#bdd7d3","#b8c8be","#91958b","#465b5e","#543933","#8e1623","#f28c7a","#eee1ca"],
-["#451c06","#743212","#9c400a","#f97e01","#929e78","#13b2bc","#0c8194"],
-["#3d4635","#5a734c","#8e472c","#a7713b","#252b21","#304543","#b18961","#cab68c"]
-]
-let colors
+    let colors;
+    let colorPicker = 0;
+    let rot;
 
-let colorPicker=0
+    function setup() {
+      createCanvas(windowWidth, windowHeight * 0.666);
+      colors = random(palettes);
+      background("#FEF3E0");
+      rot = 1;
+      shuffle(colors, true);
+      for (let x = 0; x < width + height; x += height / 2) {
+        treeShape(x, height / 2, PI * rot);
+        rot++;
+      }
+    }
 
-function setup() {
-	createCanvas(windowWidth, windowHeight*0.666);
-	colors= random(palettes)
-	background("#FEF3E0");
-	rot=1
-	shuffle(colors, true);
-	for(let x=0; x<width+height; x+=height/2){
-		treeShape(x, height/2, PI*rot)
-		rot++
-	}
- }
+    function treeShape(x, y, a) {
+      push();
+      translate(x, y);
+      rotate(a);
+      noFill();
+      strokeCap(SQUARE);
 
-function treeShape(x, y, a){
-	push()
-	translate(x, y)
-	rotate(a)
-	noFill()
-	strokeCap(SQUARE)
-	
-let count=0	
+      let count = 0;
 
-noStroke()	
-let shapeFiller=colors[colorPicker%colors.length]
-fill(shapeFiller)
-colorPicker++
-let edgeColor=colors[colorPicker%colors.length]
-colorPicker++
-let r= (height*0.7065)/2
-//to height/6
-push()
-beginShape()
-for(let a=PI-PI/4; a<TAU+PI/4; a+=TAU/600){
-	vertex(cos(a)*r, -height/4+sin(a)*r)
-}
-for(let a=PI+PI/4; a>PI-PI/4; a-=TAU/600){
-	vertex(height/2+cos(a)*r, height/4+sin(a)*r)
-}	
-	
-for(let a=PI/4; a>-PI/4; a-=TAU/600){
-	vertex(-height/2+cos(a)*r, height/4+sin(a)*r)
-}
-drawingContext.shadowOffsetX = 0;
-  drawingContext.shadowOffsetY = 0;
-  drawingContext.shadowBlur = height/3
-  drawingContext.shadowColor = edgeColor
-	
-endShape(CLOSE)
-push()
-	let stroker= color(edgeColor)
-	stroker.setAlpha(25)
-stroke(stroker)
-strokeWeight(0.1)
-for(let a=PI-PI/4; a<PI+PI/2; a+=TAU/600){
-	line(cos(a)*r, -height/4+sin(a)*r, cos(a)*r+random(height/10, height/20),-height/4+sin(a)*r )	
-}	
-	
-for(let a=PI/4; a>-PI/4; a-=TAU/600){
-	line(-height/2+cos(a)*r, height/4+sin(a)*r, -height/2+cos(a)*r+random(height/10, height/20), height/4+sin(a)*r)
-}	
-	
-pop()	
-	
-	
-	
-pop()	
-colorPicker++
-let c1= colors[colorPicker%colors.length]
-colorPicker++
-let c2=colors[colorPicker%colors.length]
-colorPicker++
-let c3=colors[colorPicker%colors.length]
-	gradCircle(0, -height/4, height/5, c1, c2, c3)
+      noStroke();
+      let shapeFiller = colors[colorPicker % colors.length];
+      fill(shapeFiller);
+      colorPicker++;
+      let edgeColor = colors[colorPicker % colors.length];
+      colorPicker++;
+      let r = (height * 0.7065) / 2;
 
-		pop()
-}
+      // Draw the main shape
+      push();
+      beginShape();
+      for (let angle = PI - PI / 4; angle < TAU + PI / 4; angle += TAU / 600) {
+        vertex(cos(angle) * r, -height / 4 + sin(angle) * r);
+      }
+      for (let angle = PI + PI / 4; angle > PI - PI / 4; angle -= TAU / 600) {
+        vertex(height / 2 + cos(angle) * r, height / 4 + sin(angle) * r);
+      }
+      for (let angle = PI / 4; angle > -PI / 4; angle -= TAU / 600) {
+        vertex(-height / 2 + cos(angle) * r, height / 4 + sin(angle) * r);
+      }
 
+      // Apply shadow
+      drawingContext.shadowOffsetX = 0;
+      drawingContext.shadowOffsetY = 0;
+      drawingContext.shadowBlur = height / 3;
+      drawingContext.shadowColor = edgeColor;
 
-function gradCircle(x, y, r, cc, c2, c3){
-	let splice= TAU/200
-	noStroke()
-	fill(0)
-	for(let a=0; a<TAU; a+=splice){
-		
-		let mixer= map(sin(a), -1, 1, 0, 1)
-		//let outerC= lerpColor(c2, c3, mixer)
-		let outerC= color(spectral.mix(c2, c3, mixer))
-		
-		coloring= drawingContext.createRadialGradient(x, y, 0.0, x+ random(-r/50, r/50),y, r*0.75)
-		coloring.addColorStop(0, cc)
-		coloring.addColorStop(1, outerC)
-		drawingContext.fillStyle= coloring	
-		
-		arc(x, y, r*2, r*2, a, a+splice+splice/30)
-		
-	}
-	
-}
+      endShape(CLOSE);
+      pop();
 
-    </script>
+      // Draw subtle lines for texture
+      push();
+      let stroker = color(edgeColor);
+      stroker.setAlpha(25);
+      stroke(stroker);
+      strokeWeight(0.1);
+
+      for (let angle = PI - PI / 4; angle < PI + PI / 2; angle += TAU / 600) {
+        line(cos(angle) * r, -height / 4 + sin(angle) * r, cos(angle) * r + random(height / 10, height / 20), -height / 4 + sin(angle) * r);
+      }
+
+      for (let angle = PI / 4; angle > -PI / 4; angle -= TAU / 600) {
+        line(-height / 2 + cos(angle) * r, height / 4 + sin(angle) * r, -height / 2 + cos(angle) * r + random(height / 10, height / 20), height / 4 + sin(angle) * r);
+      }
+
+      pop();
+
+      pop();
+
+      colorPicker++;
+      let c1 = colors[colorPicker % colors.length];
+      colorPicker++;
+      let c2 = colors[colorPicker % colors.length];
+      colorPicker++;
+      let c3 = colors[colorPicker % colors.length];
+      gradCircle(0, -height / 4, height / 5, c1, c2, c3);
+    }
+
+    function gradCircle(x, y, r, cc, c2, c3) {
+      let splice = TAU / 200;
+      noStroke();
+      fill(0);
+      for (let a = 0; a < TAU; a += splice) {
+        let mixer = map(sin(a), -1, 1, 0, 1);
+        
+        // Replace spectral.mix with lerpColor
+        let c2col = color(c2);
+        let c3col = color(c3);
+        let outerC = lerpColor(c2col, c3col, mixer);
+
+        let coloring = drawingContext.createRadialGradient(x, y, 0.0, x + random(-r / 50, r / 50), y, r * 0.75);
+        drawingContext.createRadialGradient(x, y, 0.0, x + random(-r / 50, r / 50), y, r * 0.75);
+        coloring.addColorStop(0, cc);
+        coloring.addColorStop(1, outerC.toString());
+        drawingContext.fillStyle = coloring;
+
+        arc(x, y, r * 2, r * 2, a, a + splice + splice / 30);
+      }
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight * 0.666);
+      background("#FEF3E0");
+      colorPicker = 0;
+      rot = 1;
+      shuffle(colors, true);
+      for (let x = 0; x < width + height; x += height / 2) {
+        treeShape(x, height / 2, PI * rot);
+        rot++;
+      }
+    }
+  </script>
 </body>
 </html>
